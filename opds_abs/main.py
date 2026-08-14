@@ -656,6 +656,9 @@ async def opds_library(
 async def opds_series(
     username: str,
     library_id: str,
+    request: Request,
+    page: int = 1,
+    per_page: int = 50,
     auth_info: tuple = Depends(get_authenticated_user)
 ):
     """Get series from a specific library.
@@ -663,6 +666,9 @@ async def opds_series(
     Args:
         username (str): The username path parameter.
         library_id (str): ID of the library to get series from.
+        request (Request): The incoming request object containing query parameters.
+        page (int): Page number for series pagination (1-indexed).
+        per_page (int): Number of series to include per page.
         auth_info (tuple): The authentication info (username, token, display_name).
 
     Returns:
@@ -673,7 +679,12 @@ async def opds_series(
 
         # Ensure this is the authenticated user's feed or authentication is disabled
         if AUTH_ENABLED and auth_username and username != display_name:
-            return RedirectResponse(url=f"/opds/{display_name}/libraries/{library_id}/series")
+            # Preserve query parameters in the redirect (e.g., page/per_page)
+            params_str = "&".join([f"{k}={v}" for k, v in request.query_params.items()])
+            redirect_url = f"/opds/{display_name}/libraries/{library_id}/series"
+            if params_str:
+                redirect_url += f"?{params_str}"
+            return RedirectResponse(url=redirect_url)
 
         # Use the display name from authentication if available
         effective_username = display_name if auth_username else username
@@ -681,7 +692,9 @@ async def opds_series(
         return await series_feed.generate_series_feed(
             effective_username,
             library_id,
-            token=token
+            token=token,
+            page=page,
+            per_page=per_page
         )
     except ResourceNotFoundError as e:
         # ResourceNotFoundError is already properly handled in the feed generator
@@ -697,6 +710,9 @@ async def opds_series_items(
     username: str,
     library_id: str,
     series_id: str,
+    request: Request,
+    page: int = 1,
+    per_page: int = 50,
     auth_info: tuple = Depends(get_authenticated_user)
 ):
     """Get items from a specific series.
@@ -709,6 +725,9 @@ async def opds_series_items(
         username (str): The username path parameter identifying the user.
         library_id (str): ID of the library containing the series.
         series_id (str): ID of the specific series to get books from.
+        request (Request): The incoming request object containing query parameters.
+        page (int): Page number for series items pagination (1-indexed).
+        per_page (int): Number of books to include per page.
         auth_info (tuple): The authentication info (username, token, display_name).
 
     Returns:
@@ -724,7 +743,12 @@ async def opds_series_items(
 
         # Ensure this is the authenticated user's feed or authentication is disabled
         if AUTH_ENABLED and auth_username and username != display_name:
-            return RedirectResponse(url=f"/opds/{display_name}/libraries/{library_id}/series/{series_id}")
+            # Preserve query parameters in the redirect (e.g., page/per_page)
+            params_str = "&".join([f"{k}={v}" for k, v in request.query_params.items()])
+            redirect_url = f"/opds/{display_name}/libraries/{library_id}/series/{series_id}"
+            if params_str:
+                redirect_url += f"?{params_str}"
+            return RedirectResponse(url=redirect_url)
 
         # Use the display name from authentication if available
         effective_username = display_name if auth_username else username
@@ -733,7 +757,9 @@ async def opds_series_items(
             effective_username,
             library_id,
             series_id,
-            token=token
+            token=token,
+            page=page,
+            per_page=per_page
         )
     except ResourceNotFoundError as e:
         # ResourceNotFoundError is already properly handled in the feed generator
@@ -831,6 +857,9 @@ async def opds_collection_items(
 async def opds_authors(
     username: str,
     library_id: str,
+    request: Request,
+    page: int = 1,
+    per_page: int = 50,
     auth_info: tuple = Depends(get_authenticated_user)
 ):
     """Get authors from a specific library.
@@ -838,6 +867,9 @@ async def opds_authors(
     Args:
         username (str): The username path parameter.
         library_id (str): ID of the library to get authors from.
+        request (Request): The incoming request object containing query parameters.
+        page (int): Page number for authors pagination (1-indexed).
+        per_page (int): Number of authors to include per page.
         auth_info (tuple): The authentication info (username, token, display_name).
 
     Returns:
@@ -848,7 +880,12 @@ async def opds_authors(
 
         # Ensure this is the authenticated user's feed or authentication is disabled
         if AUTH_ENABLED and auth_username and username != display_name:
-            return RedirectResponse(url=f"/opds/{display_name}/libraries/{library_id}/authors")
+            # Preserve query parameters in the redirect (e.g., page/per_page)
+            params_str = "&".join([f"{k}={v}" for k, v in request.query_params.items()])
+            redirect_url = f"/opds/{display_name}/libraries/{library_id}/authors"
+            if params_str:
+                redirect_url += f"?{params_str}"
+            return RedirectResponse(url=redirect_url)
 
         # Use the display name from authentication if available
         effective_username = display_name if auth_username else username
@@ -856,7 +893,9 @@ async def opds_authors(
         return await author_feed.generate_authors_feed(
             effective_username,
             library_id,
-            token=token
+            token=token,
+            page=page,
+            per_page=per_page
         )
     except ResourceNotFoundError as e:
         # ResourceNotFoundError is already properly handled in the feed generator
@@ -872,6 +911,9 @@ async def opds_author_items(
     username: str,
     library_id: str,
     author_id: str,
+    request: Request,
+    page: int = 1,
+    per_page: int = 50,
     auth_info: tuple = Depends(get_authenticated_user)
 ):
     """Get items from a specific author using cached data when possible.
@@ -880,6 +922,9 @@ async def opds_author_items(
         username (str): The username path parameter.
         library_id (str): ID of the library to get items from.
         author_id (str): ID of the author to filter by.
+        request (Request): The incoming request object containing query parameters.
+        page (int): Page number for author items pagination (1-indexed).
+        per_page (int): Number of books to include per page.
         auth_info (tuple): The authentication info (username, token, display_name).
 
     Returns:
@@ -890,7 +935,12 @@ async def opds_author_items(
 
         # Ensure this is the authenticated user's feed or authentication is disabled
         if AUTH_ENABLED and auth_username and username != display_name:
-            return RedirectResponse(url=f"/opds/{display_name}/libraries/{library_id}/authors/{author_id}")
+            # Preserve query parameters in the redirect (e.g., page/per_page)
+            params_str = "&".join([f"{k}={v}" for k, v in request.query_params.items()])
+            redirect_url = f"/opds/{display_name}/libraries/{library_id}/authors/{author_id}"
+            if params_str:
+                redirect_url += f"?{params_str}"
+            return RedirectResponse(url=redirect_url)
 
         # Use the display name from authentication if available
         effective_username = display_name if auth_username else username
@@ -899,7 +949,9 @@ async def opds_author_items(
             effective_username,
             library_id,
             author_id,
-            token=token
+            token=token,
+            page=page,
+            per_page=per_page
         )
     except ResourceNotFoundError as e:
         # ResourceNotFoundError is already properly handled in the feed generator

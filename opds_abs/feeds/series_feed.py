@@ -251,7 +251,8 @@ class SeriesFeedGenerator(BaseFeedGenerator):
             }
             return filtered_items, series_details
 
-    async def generate_series_items_feed(self, username, library_id, series_id, token=None):
+    async def generate_series_items_feed(self, username, library_id, series_id, token=None,
+                                         page: int = 1, per_page: int = None):
         """Generate a feed of items in a specific series.
 
         Args:
@@ -259,6 +260,8 @@ class SeriesFeedGenerator(BaseFeedGenerator):
             library_id (str): The ID of the library to generate the feed for.
             series_id (str): The ID of the series to filter by.
             token (str, optional): Authentication token for Audiobookshelf.
+            page (int): The page number to display (1-indexed).
+            per_page (int): Number of books per page.
 
         Returns:
             Response: A FastAPI response object containing the XML feed.
@@ -333,14 +336,58 @@ class SeriesFeedGenerator(BaseFeedGenerator):
 
             logger.debug("Sorted %d items by sequence number for %s", len(sorted_library_items), series_name)
 
+            # Check if pagination is enabled
+            if not PAGINATION_ENABLED:
+                # Pagination is disabled, show all items
+                per_page = 0
+                no_pagination = True
+            else:
+                # Use items per page from config if not specified
+                per_page = ITEMS_PER_PAGE if per_page is None else per_page
+                # If per_page is 0, we'll show all items without pagination
+                no_pagination = (per_page <= 0)
+
+            # Apply pagination
+            total_books = len(sorted_library_items)
+            total_pages = 1 if no_pagination else (total_books + per_page - 1) // per_page  # Ceiling division
+
+            # Adjust page number if out of bounds
+            if page < 1:
+                page = 1
+            elif page > total_pages and total_pages > 0:
+                page = total_pages
+
+            if no_pagination:
+                # No pagination, show all items
+                paged_items = sorted_library_items
+            else:
+                # Calculate start and end indices
+                start_idx = (page - 1) * per_page
+                end_idx = min(start_idx + per_page, total_books)
+
+                # Get the subset of books for this page
+                paged_items = sorted_library_items[start_idx:end_idx]
+
+            # Add pagination links only if pagination is enabled
+            if not no_pagination:
+                self._add_pagination_links_for_series_items(
+                    feed,
+                    username,
+                    library_id,
+                    series_id,
+                    page,
+                    total_pages,
+                    token
+                )
+
             # Get ebook files for each book
             tasks = []
-            for book in sorted_library_items:
+            for book in paged_items:
                 book_id = book.get("id", "")
                 tasks.append(get_download_urls_from_item(book_id, username=username, token=token))
 
             ebook_inos_list = await asyncio.gather(*tasks)
-            for book, ebook_inos in zip(sorted_library_items, ebook_inos_list):
+            for book, ebook_inos in zip(paged_items, ebook_inos_list):
                 self.add_book_to_feed(feed, book, ebook_inos, "", token)
 
             return self.create_response(feed)
@@ -475,13 +522,129 @@ class SeriesFeedGenerator(BaseFeedGenerator):
         # Convert the dictionary to XML elements
         dict_to_xml(feed, entry_data)
 
-    async def generate_series_feed(self, username, library_id, token=None):
+    def _add_pagination_links_for_series(self, feed, username, library_id,
+                                         current_page: int, total_pages: int, token=None):
+        """Add pagination links to the series listing feed.
+
+        Args:
+            feed: The XML feed object to add links to
+            username: The username for URLs
+            library_id: The library ID for URLs
+            current_page: Current page number
+            total_pages: Total number of pages
+            token: Optional token to include in URLs
+        """
+        base_url = f"/opds/{username}/libraries/{library_id}/series"
+        token_param = f"&token={token}" if token else ""
+
+        links = []
+
+        if current_page > 1:
+            links.append({
+                "_attrs": {
+                    "rel": "first",
+                    "href": f"{base_url}?page=1{token_param}",
+                    "type": "application/atom+xml;profile=opds-catalog"
+                }
+            })
+
+        if current_page > 1:
+            links.append({
+                "_attrs": {
+                    "rel": "previous",
+                    "href": f"{base_url}?page={current_page-1}{token_param}",
+                    "type": "application/atom+xml;profile=opds-catalog"
+                }
+            })
+
+        if current_page < total_pages:
+            links.append({
+                "_attrs": {
+                    "rel": "next",
+                    "href": f"{base_url}?page={current_page+1}{token_param}",
+                    "type": "application/atom+xml;profile=opds-catalog"
+                }
+            })
+
+        if current_page < total_pages:
+            links.append({
+                "_attrs": {
+                    "rel": "last",
+                    "href": f"{base_url}?page={total_pages}{token_param}",
+                    "type": "application/atom+xml;profile=opds-catalog"
+                }
+            })
+
+        for link in links:
+            dict_to_xml(feed, {"link": link})
+
+    def _add_pagination_links_for_series_items(self, feed, username, library_id, series_id,
+                                               current_page: int, total_pages: int, token=None):
+        """Add pagination links to the series items feed.
+
+        Args:
+            feed: The XML feed object to add links to
+            username: The username for URLs
+            library_id: The library ID for URLs
+            series_id: The series ID for URLs
+            current_page: Current page number
+            total_pages: Total number of pages
+            token: Optional token to include in URLs
+        """
+        base_url = f"/opds/{username}/libraries/{library_id}/series/{series_id}"
+        token_param = f"&token={token}" if token else ""
+
+        links = []
+
+        if current_page > 1:
+            links.append({
+                "_attrs": {
+                    "rel": "first",
+                    "href": f"{base_url}?page=1{token_param}",
+                    "type": "application/atom+xml;profile=opds-catalog"
+                }
+            })
+
+        if current_page > 1:
+            links.append({
+                "_attrs": {
+                    "rel": "previous",
+                    "href": f"{base_url}?page={current_page-1}{token_param}",
+                    "type": "application/atom+xml;profile=opds-catalog"
+                }
+            })
+
+        if current_page < total_pages:
+            links.append({
+                "_attrs": {
+                    "rel": "next",
+                    "href": f"{base_url}?page={current_page+1}{token_param}",
+                    "type": "application/atom+xml;profile=opds-catalog"
+                }
+            })
+
+        if current_page < total_pages:
+            links.append({
+                "_attrs": {
+                    "rel": "last",
+                    "href": f"{base_url}?page={total_pages}{token_param}",
+                    "type": "application/atom+xml;profile=opds-catalog"
+                }
+            })
+
+        for link in links:
+            dict_to_xml(feed, {"link": link})
+
+    async def generate_series_feed(self, username, library_id, token=None,
+                                   page: int = 1, per_page: int = 50):
         """Display all series in the library.
 
         Args:
             username (str): The username requesting the feed.
             library_id (str): The ID of the library to generate the feed for.
             token (str, optional): Authentication token for Audiobookshelf.
+            page (int): The page number to display (1-indexed).
+            per_page (int): Number of series per page.
 
         Returns:
             Response: A FastAPI response object containing the XML feed.
@@ -502,7 +665,29 @@ class SeriesFeedGenerator(BaseFeedGenerator):
 
         series_items = self.filter_series(data)
 
-        for series in series_items:
+        # Sort series by name for stable pagination
+        series_items = sorted(series_items, key=lambda x: x.get("name", "").lower())
+
+        total_series = len(series_items)
+        total_pages = (total_series + per_page - 1) // per_page  # Ceiling division
+
+        # Adjust page number if out of bounds
+        if page < 1:
+            page = 1
+        elif page > total_pages and total_pages > 0:
+            page = total_pages
+
+        # Calculate start and end indices
+        start_idx = (page - 1) * per_page
+        end_idx = min(start_idx + per_page, total_series)
+
+        # Get only the series for this page
+        paged_series_items = series_items[start_idx:end_idx]
+
+        # Add pagination links
+        self._add_pagination_links_for_series(feed, username, library_id, page, total_pages, token)
+
+        for series in paged_series_items:
             await self.add_series_to_feed(username, library_id, feed, series, token)
 
         return self.create_response(feed)
