@@ -29,5 +29,12 @@ navigation = [
             "desc":   "Browse by author",
             "path":   "authors",
             "params": ""
+        },
+        {
+            "name":   "Personalized",
+            "desc":   "Continue listening and continue series",
+            "path":   "personalized",
+            "params": "",
+            "icon":   "libraries.png"
         }
 ]

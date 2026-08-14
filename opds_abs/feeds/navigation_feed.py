@@ -119,6 +119,7 @@ class NavigationFeedGenerator(BaseFeedGenerator):
                 # Set up navigation item paths and URLs
                 base_path = f"/opds/{username}/libraries/{library_id}/"
                 nav_params = nav.get('params','')
+                icon_filename = nav.get("icon", f"{nav.get('name').lower()}.png")
 
                 # Add authentication token to nav_params if available
                 if token and nav_params:
@@ -149,7 +150,7 @@ class NavigationFeedGenerator(BaseFeedGenerator):
                             },
                             {
                                 "_attrs": {
-                                    "href": f"/static/images/{nav.get('name').lower()}.png",
+                                    "href": f"/static/images/{icon_filename}",
                                     "rel": "http://opds-spec.org/image",
                                     "type": "image/png"
                                 }

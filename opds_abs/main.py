@@ -68,6 +68,7 @@ from opds_abs.feeds.series_feed import SeriesFeedGenerator
 from opds_abs.feeds.collection_feed import CollectionFeedGenerator
 from opds_abs.feeds.author_feed import AuthorFeedGenerator
 from opds_abs.feeds.search_feed import SearchFeedGenerator
+from opds_abs.feeds.personalized_feed import PersonalizedFeedGenerator
 from opds_abs.utils.cache_utils import _cache, clear_cache, load_cache_from_disk, save_cache_to_disk
 from opds_abs.api.client import invalidate_cache
 from opds_abs.utils.auth_utils import get_authenticated_user, require_auth
@@ -152,6 +153,7 @@ series_feed = SeriesFeedGenerator()
 collection_feed = CollectionFeedGenerator()
 author_feed = AuthorFeedGenerator()
 search_feed = SearchFeedGenerator()
+personalized_feed = PersonalizedFeedGenerator()
 
 # Create startup and shutdown sequences for loading cache
 @asynccontextmanager
@@ -587,6 +589,150 @@ async def opds_search(
         raise
     except Exception as e:
         context = f"Searching in library {library_id} for user {username}"
+        log_error(e, context=context)
+        return handle_exception(e, context=context)
+
+
+@app.get("/opds/{username}/libraries/{library_id}/personalized")
+async def opds_personalized(
+    username: str,
+    library_id: str,
+    request: Request,
+    auth_info: tuple = Depends(get_authenticated_user)
+):
+    """Get personalized navigation options for a specific library.
+
+    Args:
+        username (str): The username path parameter.
+        library_id (str): ID of the library.
+        request (Request): The incoming request object containing query parameters.
+        auth_info (tuple): The authentication info (username, token, display_name).
+
+    Returns:
+        Response: A personalized feed with section links.
+    """
+    try:
+        auth_username, token, display_name = auth_info
+
+        # Ensure this is the authenticated user's feed or authentication is disabled
+        if AUTH_ENABLED and auth_username and username != display_name:
+            params_str = "&".join([f"{k}={v}" for k, v in request.query_params.items()])
+            redirect_url = f"/opds/{display_name}/libraries/{library_id}/personalized"
+            if params_str:
+                redirect_url += f"?{params_str}"
+            return RedirectResponse(url=redirect_url)
+
+        effective_username = display_name if auth_username else username
+
+        return await personalized_feed.generate_personalized_feed(
+            effective_username,
+            library_id,
+            token=token
+        )
+    except ResourceNotFoundError:
+        raise
+    except Exception as e:
+        context = f"Generating personalized feed for user {username}, library {library_id}"
+        log_error(e, context=context)
+        return handle_exception(e, context=context)
+
+
+@app.get("/opds/{username}/libraries/{library_id}/personalized/continue-listening")
+async def opds_continue_listening(
+    username: str,
+    library_id: str,
+    request: Request,
+    page: int = 1,
+    per_page: int = 50,
+    auth_info: tuple = Depends(get_authenticated_user)
+):
+    """Get the continue-listening personalized feed for a specific library.
+
+    Args:
+        username (str): The username path parameter.
+        library_id (str): ID of the library.
+        request (Request): The incoming request object containing query parameters.
+        page (int): Page number for continue-listening pagination (1-indexed).
+        per_page (int): Number of books to include per page.
+        auth_info (tuple): The authentication info (username, token, display_name).
+
+    Returns:
+        Response: A paginated continue-listening feed.
+    """
+    try:
+        auth_username, token, display_name = auth_info
+
+        # Ensure this is the authenticated user's feed or authentication is disabled
+        if AUTH_ENABLED and auth_username and username != display_name:
+            params_str = "&".join([f"{k}={v}" for k, v in request.query_params.items()])
+            redirect_url = f"/opds/{display_name}/libraries/{library_id}/personalized/continue-listening"
+            if params_str:
+                redirect_url += f"?{params_str}"
+            return RedirectResponse(url=redirect_url)
+
+        effective_username = display_name if auth_username else username
+
+        return await personalized_feed.generate_continue_listening_feed(
+            effective_username,
+            library_id,
+            token=token,
+            page=page,
+            per_page=per_page
+        )
+    except ResourceNotFoundError:
+        raise
+    except Exception as e:
+        context = f"Generating continue-listening feed for user {username}, library {library_id}"
+        log_error(e, context=context)
+        return handle_exception(e, context=context)
+
+
+@app.get("/opds/{username}/libraries/{library_id}/personalized/continue-series")
+async def opds_continue_series(
+    username: str,
+    library_id: str,
+    request: Request,
+    page: int = 1,
+    per_page: int = 50,
+    auth_info: tuple = Depends(get_authenticated_user)
+):
+    """Get the continue-series personalized feed for a specific library.
+
+    Args:
+        username (str): The username path parameter.
+        library_id (str): ID of the library.
+        request (Request): The incoming request object containing query parameters.
+        page (int): Page number for continue-series pagination (1-indexed).
+        per_page (int): Number of series to include per page.
+        auth_info (tuple): The authentication info (username, token, display_name).
+
+    Returns:
+        Response: A paginated continue-series feed.
+    """
+    try:
+        auth_username, token, display_name = auth_info
+
+        # Ensure this is the authenticated user's feed or authentication is disabled
+        if AUTH_ENABLED and auth_username and username != display_name:
+            params_str = "&".join([f"{k}={v}" for k, v in request.query_params.items()])
+            redirect_url = f"/opds/{display_name}/libraries/{library_id}/personalized/continue-series"
+            if params_str:
+                redirect_url += f"?{params_str}"
+            return RedirectResponse(url=redirect_url)
+
+        effective_username = display_name if auth_username else username
+
+        return await personalized_feed.generate_continue_series_feed(
+            effective_username,
+            library_id,
+            token=token,
+            page=page,
+            per_page=per_page
+        )
+    except ResourceNotFoundError:
+        raise
+    except Exception as e:
+        context = f"Generating continue-series feed for user {username}, library {library_id}"
         log_error(e, context=context)
         return handle_exception(e, context=context)
 

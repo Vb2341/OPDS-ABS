@@ -6,6 +6,7 @@ from opds_abs.feeds.series_feed import SeriesFeedGenerator
 from opds_abs.feeds.collection_feed import CollectionFeedGenerator
 from opds_abs.feeds.author_feed import AuthorFeedGenerator
 from opds_abs.feeds.search_feed import SearchFeedGenerator
+from opds_abs.feeds.personalized_feed import PersonalizedFeedGenerator
 
 __all__ = [
     'LibraryFeedGenerator',
@@ -13,5 +14,6 @@ __all__ = [
     'SeriesFeedGenerator',
     'CollectionFeedGenerator',
     'AuthorFeedGenerator',
-    'SearchFeedGenerator'
+    'SearchFeedGenerator',
+    'PersonalizedFeedGenerator'
 ]
